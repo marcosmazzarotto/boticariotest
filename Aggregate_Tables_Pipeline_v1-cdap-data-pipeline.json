@@ -1,0 +1,63 @@
+{
+    "name": "Aggregate_Tables_Pipeline_v1",
+    "description": "Data Pipeline Application",
+    "artifact": {
+        "name": "cdap-data-pipeline",
+        "version": "6.3.0",
+        "scope": "SYSTEM"
+    },
+    "config": {
+        "resources": {
+            "memoryMB": 2048,
+            "virtualCores": 1
+        },
+        "driverResources": {
+            "memoryMB": 2048,
+            "virtualCores": 1
+        },
+        "connections": [],
+        "comments": [],
+        "postActions": [],
+        "properties": {},
+        "processTimingEnabled": true,
+        "stageLoggingEnabled": false,
+        "stages": [
+            {
+                "name": "BigQuery Execute",
+                "plugin": {
+                    "name": "BigQueryExecute",
+                    "type": "action",
+                    "label": "BigQuery Execute",
+                    "artifact": {
+                        "name": "google-cloud",
+                        "version": "0.16.0",
+                        "scope": "SYSTEM"
+                    },
+                    "properties": {
+                        "project": "auto-detect",
+                        "sql": "CREATE OR REPLACE TABLE\n  boticariodb.AGG_VENDAS_MES_ANO AS (\n  SELECT\n    EXTRACT (YEAR FROM DATA_VENDA) AS ANO,\n    EXTRACT (MONTH FROM DATA_VENDA) AS MES,\n    COUNT(qtd_venda) AS TOTAL_VENDAS \n  FROM\n    `boticario-307001.boticariodb.S_CSV_LOAD`\n  GROUP BY\n    1,2 \n    );\n    \nCREATE OR REPLACE TABLE\n  boticariodb.AGG_VENDAS_MARCA_LINHA AS (\n  SELECT\n    marca,\n    linha,\n    COUNT(qtd_venda) AS TOTAL_VENDAS \n  FROM\n    `boticario-307001.boticariodb.S_CSV_LOAD`\n  GROUP BY\n    1,2 \n    );\n    \nCREATE OR REPLACE TABLE\n  boticariodb.AGG_VENDAS_MARCA_ANO_MES AS (\n  SELECT\n    marca,\n    EXTRACT (YEAR FROM DATA_VENDA) AS ANO,\n    EXTRACT (MONTH FROM DATA_VENDA) AS MES,\n    COUNT(qtd_venda) AS TOTAL_VENDAS \n  FROM\n    `boticario-307001.boticariodb.S_CSV_LOAD`\n  GROUP BY\n    1,2,3 \n    );\n\nCREATE OR REPLACE TABLE\n  boticariodb.AGG_VENDAS_LINHA_ANO_MES AS (\n  SELECT\n    linha,\n    EXTRACT (YEAR FROM DATA_VENDA) AS ANO,\n    EXTRACT (MONTH FROM DATA_VENDA) AS MES,\n    COUNT(qtd_venda) AS TOTAL_VENDAS \n  FROM\n    `boticario-307001.boticariodb.S_CSV_LOAD`\n  GROUP BY\n    1,2,3 \n    );\n",
+                        "dialect": "standard",
+                        "mode": "batch",
+                        "useCache": "false",
+                        "location": "US",
+                        "rowAsArguments": "false",
+                        "serviceAccountType": "filePath",
+                        "serviceFilePath": "auto-detect"
+                    }
+                },
+                "outputSchema": [
+                    {
+                        "name": "etlSchemaBody",
+                        "schema": ""
+                    }
+                ],
+                "id": "BigQuery-Execute"
+            }
+        ],
+        "schedule": "0 * * * *",
+        "engine": "spark",
+        "numOfRecordsPreview": 100,
+        "description": "Data Pipeline Application",
+        "maxConcurrentRuns": 1
+    }
+}

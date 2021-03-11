@@ -1,0 +1,346 @@
+{
+    "name": "CSV_CLEANSE_LOAD_v1",
+    "description": "Data Pipeline Application",
+    "artifact": {
+        "name": "cdap-data-pipeline",
+        "version": "6.3.0",
+        "scope": "SYSTEM"
+    },
+    "config": {
+        "resources": {
+            "memoryMB": 2048,
+            "virtualCores": 1
+        },
+        "driverResources": {
+            "memoryMB": 2048,
+            "virtualCores": 1
+        },
+        "connections": [
+            {
+                "from": "CSV_2017",
+                "to": "Cleanse_2017"
+            },
+            {
+                "from": "Cleanse_2017",
+                "to": "Remove_duplicates"
+            },
+            {
+                "from": "Remove_duplicates",
+                "to": "BigQueryLoad"
+            },
+            {
+                "from": "CSV_2018",
+                "to": "Cleanse_2018"
+            },
+            {
+                "from": "CSV_2019",
+                "to": "Cleanse_2019"
+            },
+            {
+                "from": "Cleanse_2018",
+                "to": "Remove_duplicates"
+            },
+            {
+                "from": "Cleanse_2019",
+                "to": "Remove_duplicates"
+            }
+        ],
+        "comments": [],
+        "postActions": [],
+        "properties": {},
+        "processTimingEnabled": true,
+        "stageLoggingEnabled": true,
+        "stages": [
+            {
+                "name": "CSV_2017",
+                "plugin": {
+                    "name": "GCSFile",
+                    "type": "batchsource",
+                    "label": "CSV_2017",
+                    "artifact": {
+                        "name": "google-cloud",
+                        "version": "0.16.0",
+                        "scope": "SYSTEM"
+                    },
+                    "properties": {
+                        "filenameOnly": "false",
+                        "copyHeader": "true",
+                        "schema": "{\"type\":\"record\",\"name\":\"text\",\"fields\":[{\"name\":\"body\",\"type\":\"string\"}]}",
+                        "path": "gs://bucket_boticario/input/Base_2017_1.csv",
+                        "format": "text",
+                        "project": "boticario-307001",
+                        "recursive": "false",
+                        "referenceName": "bucket_boticario.Base_2018_2.csv",
+                        "skipHeader": "false",
+                        "serviceAccountType": "filePath",
+                        "serviceFilePath": "auto-detect",
+                        "encrypted": "false",
+                        "fileEncoding": "UTF-8"
+                    }
+                },
+                "outputSchema": [
+                    {
+                        "name": "etlSchemaBody",
+                        "schema": "{\"type\":\"record\",\"name\":\"text\",\"fields\":[{\"name\":\"body\",\"type\":\"string\"}]}"
+                    }
+                ],
+                "id": "CSV_2017"
+            },
+            {
+                "name": "Cleanse_2017",
+                "plugin": {
+                    "name": "Wrangler",
+                    "type": "transform",
+                    "label": "Cleanse_2017",
+                    "artifact": {
+                        "name": "wrangler-transform",
+                        "version": "4.3.0",
+                        "scope": "SYSTEM"
+                    },
+                    "properties": {
+                        "field": "*",
+                        "precondition": "false",
+                        "directives": "parse-as-csv :body ';' true\ndrop :body\ncleanse-column-names\nrename _id_marca id_marca\nset-type :id_marca integer\nset-type :id_linha long\nset-type :id_linha integer\nset-type :qtd_venda integer\nparse-as-simple-date :data_venda dd/MM/yyyy\nset-column data_venda data_venda.toLocalDate()",
+                        "on-error": "skip-error",
+                        "schema": "{\"name\":\"avroSchema\",\"type\":\"record\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"int\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"int\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"int\",\"null\"]}]}",
+                        "workspaceId": "713f08e2-e86e-4b2e-b79d-a9476feb3814"
+                    }
+                },
+                "outputSchema": [
+                    {
+                        "name": "etlSchemaBody",
+                        "schema": "{\"name\":\"avroSchema\",\"type\":\"record\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"int\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"int\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"int\",\"null\"]}]}"
+                    }
+                ],
+                "inputSchema": [
+                    {
+                        "name": "CSV_2017",
+                        "schema": "{\"type\":\"record\",\"name\":\"text\",\"fields\":[{\"name\":\"body\",\"type\":\"string\"}]}"
+                    }
+                ],
+                "id": "Cleanse_2017"
+            },
+            {
+                "name": "Remove_duplicates",
+                "plugin": {
+                    "name": "Deduplicate",
+                    "type": "batchaggregator",
+                    "label": "Remove_duplicates",
+                    "artifact": {
+                        "name": "core-plugins",
+                        "version": "2.5.0",
+                        "scope": "SYSTEM"
+                    },
+                    "properties": {
+                        "uniqueFields": "id_marca,marca,id_linha,linha,data_venda,qtd_venda"
+                    }
+                },
+                "outputSchema": [
+                    {
+                        "name": "etlSchemaBody",
+                        "schema": "{\"type\":\"record\",\"name\":\"avroSchema.typededup\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"int\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"int\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"int\",\"null\"]}]}"
+                    }
+                ],
+                "inputSchema": [
+                    {
+                        "name": "Cleanse_2018",
+                        "schema": "{\"name\":\"avroSchema\",\"type\":\"record\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"int\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"int\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"int\",\"null\"]}]}"
+                    },
+                    {
+                        "name": "Cleanse_2017",
+                        "schema": "{\"name\":\"avroSchema\",\"type\":\"record\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"int\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"int\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"int\",\"null\"]}]}"
+                    },
+                    {
+                        "name": "Cleanse_2019",
+                        "schema": "{\"name\":\"avroSchema\",\"type\":\"record\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"int\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"int\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"int\",\"null\"]}]}"
+                    }
+                ],
+                "id": "Remove_duplicates"
+            },
+            {
+                "name": "BigQueryLoad",
+                "plugin": {
+                    "name": "BigQueryTable",
+                    "type": "batchsink",
+                    "label": "BigQueryLoad",
+                    "artifact": {
+                        "name": "google-cloud",
+                        "version": "0.16.0",
+                        "scope": "SYSTEM"
+                    },
+                    "properties": {
+                        "referenceName": "bqload",
+                        "project": "auto-detect",
+                        "dataset": "boticariodb",
+                        "table": "S_CSV_LOAD",
+                        "serviceAccountType": "filePath",
+                        "serviceFilePath": "auto-detect",
+                        "operation": "insert",
+                        "truncateTable": "true",
+                        "allowSchemaRelaxation": "true",
+                        "location": "US",
+                        "createPartitionedTable": "false",
+                        "partitioningType": "NONE",
+                        "schema": "{\"type\":\"record\",\"name\":\"avroSchema.typedistinct\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"long\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"long\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"long\",\"null\"]}]}"
+                    }
+                },
+                "outputSchema": [
+                    {
+                        "name": "etlSchemaBody",
+                        "schema": "{\"type\":\"record\",\"name\":\"avroSchema.typedistinct\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"long\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"long\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"long\",\"null\"]}]}"
+                    }
+                ],
+                "inputSchema": [
+                    {
+                        "name": "Remove_duplicates",
+                        "schema": "{\"type\":\"record\",\"name\":\"avroSchema.typededup\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"int\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"int\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"int\",\"null\"]}]}"
+                    }
+                ],
+                "id": "BigQueryLoad"
+            },
+            {
+                "name": "CSV_2018",
+                "plugin": {
+                    "name": "GCSFile",
+                    "type": "batchsource",
+                    "label": "CSV_2018",
+                    "artifact": {
+                        "name": "google-cloud",
+                        "version": "0.16.0",
+                        "scope": "SYSTEM"
+                    },
+                    "properties": {
+                        "filenameOnly": "false",
+                        "copyHeader": "true",
+                        "schema": "{\"type\":\"record\",\"name\":\"text\",\"fields\":[{\"name\":\"body\",\"type\":\"string\"}]}",
+                        "path": "gs://bucket_boticario/input/Base_2018_2.csv",
+                        "format": "text",
+                        "project": "boticario-307001",
+                        "recursive": "false",
+                        "referenceName": "bucket_boticario.Base_2018_2.csv",
+                        "skipHeader": "false",
+                        "serviceAccountType": "filePath",
+                        "serviceFilePath": "auto-detect",
+                        "encrypted": "false",
+                        "fileEncoding": "UTF-8"
+                    }
+                },
+                "outputSchema": [
+                    {
+                        "name": "etlSchemaBody",
+                        "schema": "{\"type\":\"record\",\"name\":\"text\",\"fields\":[{\"name\":\"body\",\"type\":\"string\"}]}"
+                    }
+                ],
+                "id": "CSV_2018"
+            },
+            {
+                "name": "Cleanse_2018",
+                "plugin": {
+                    "name": "Wrangler",
+                    "type": "transform",
+                    "label": "Cleanse_2018",
+                    "artifact": {
+                        "name": "wrangler-transform",
+                        "version": "4.3.0",
+                        "scope": "SYSTEM"
+                    },
+                    "properties": {
+                        "field": "*",
+                        "precondition": "false",
+                        "directives": "parse-as-csv :body ';' true\ndrop :body\ncleanse-column-names\nrename _id_marca id_marca\nset-type :id_marca integer\nset-type :id_linha integer\nset-type :qtd_venda integer\nparse-as-simple-date :data_venda dd/MM/yyyy\nset-column data_venda data_venda.toLocalDate()",
+                        "on-error": "skip-error",
+                        "schema": "{\"name\":\"avroSchema\",\"type\":\"record\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"int\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"int\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"int\",\"null\"]}]}",
+                        "workspaceId": "3b23e351-99aa-4d48-854f-5c3eea010948"
+                    }
+                },
+                "outputSchema": [
+                    {
+                        "name": "etlSchemaBody",
+                        "schema": "{\"name\":\"avroSchema\",\"type\":\"record\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"int\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"int\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"int\",\"null\"]}]}"
+                    }
+                ],
+                "inputSchema": [
+                    {
+                        "name": "CSV_2018",
+                        "schema": "{\"type\":\"record\",\"name\":\"text\",\"fields\":[{\"name\":\"body\",\"type\":\"string\"}]}"
+                    }
+                ],
+                "id": "Cleanse_2018"
+            },
+            {
+                "name": "CSV_2019",
+                "plugin": {
+                    "name": "GCSFile",
+                    "type": "batchsource",
+                    "label": "CSV_2019",
+                    "artifact": {
+                        "name": "google-cloud",
+                        "version": "0.16.0",
+                        "scope": "SYSTEM"
+                    },
+                    "properties": {
+                        "filenameOnly": "false",
+                        "copyHeader": "true",
+                        "schema": "{\"type\":\"record\",\"name\":\"text\",\"fields\":[{\"name\":\"body\",\"type\":\"string\"}]}",
+                        "path": "gs://bucket_boticario/input/Base_2019_3.csv",
+                        "format": "text",
+                        "project": "boticario-307001",
+                        "recursive": "false",
+                        "referenceName": "bucket_boticario.Base_2019_3.csv",
+                        "skipHeader": "false",
+                        "serviceAccountType": "filePath",
+                        "serviceFilePath": "auto-detect",
+                        "encrypted": "false",
+                        "fileEncoding": "UTF-8"
+                    }
+                },
+                "outputSchema": [
+                    {
+                        "name": "etlSchemaBody",
+                        "schema": "{\"type\":\"record\",\"name\":\"text\",\"fields\":[{\"name\":\"body\",\"type\":\"string\"}]}"
+                    }
+                ],
+                "id": "CSV_2019"
+            },
+            {
+                "name": "Cleanse_2019",
+                "plugin": {
+                    "name": "Wrangler",
+                    "type": "transform",
+                    "label": "Cleanse_2019",
+                    "artifact": {
+                        "name": "wrangler-transform",
+                        "version": "4.3.0",
+                        "scope": "SYSTEM"
+                    },
+                    "properties": {
+                        "field": "*",
+                        "precondition": "false",
+                        "directives": "parse-as-csv :body ';' true\ndrop :body\ncleanse-column-names\nrename _id_marca id_marca\nset-type :id_marca integer\nset-type :id_linha integer\nset-type :qtd_venda integer\nparse-as-simple-date :data_venda dd/MM/yyyy\nset-column data_venda data_venda.toLocalDate()",
+                        "on-error": "skip-error",
+                        "schema": "{\"name\":\"avroSchema\",\"type\":\"record\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"int\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"int\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"int\",\"null\"]}]}",
+                        "workspaceId": "2c5d0ad6-ea2c-4763-a48d-f63fb16eecaf"
+                    }
+                },
+                "outputSchema": [
+                    {
+                        "name": "etlSchemaBody",
+                        "schema": "{\"name\":\"avroSchema\",\"type\":\"record\",\"fields\":[{\"name\":\"id_marca\",\"type\":[\"int\",\"null\"]},{\"name\":\"marca\",\"type\":[\"string\",\"null\"]},{\"name\":\"id_linha\",\"type\":[\"int\",\"null\"]},{\"name\":\"linha\",\"type\":[\"string\",\"null\"]},{\"name\":\"data_venda\",\"type\":[{\"type\":\"int\",\"logicalType\":\"date\"},\"null\"]},{\"name\":\"qtd_venda\",\"type\":[\"int\",\"null\"]}]}"
+                    }
+                ],
+                "inputSchema": [
+                    {
+                        "name": "CSV_2019",
+                        "schema": "{\"type\":\"record\",\"name\":\"text\",\"fields\":[{\"name\":\"body\",\"type\":\"string\"}]}"
+                    }
+                ],
+                "id": "Cleanse_2019"
+            }
+        ],
+        "schedule": "0 * * * *",
+        "engine": "spark",
+        "numOfRecordsPreview": 100,
+        "description": "Data Pipeline Application",
+        "maxConcurrentRuns": 1
+    }
+}
